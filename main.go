@@ -102,7 +102,24 @@ func readImportExcel(){
 	for index,key := range log4jList{
 		fmt.Printf("\t%d\t%s\t%s\t%s\n",index+1,key.IP,key.version,key.filepath)
 	}
+	if *processType == "rm"{
+		fmt.Printf("Remove JndiLookup.class List:\n")
+		for index,key := range bugList{
+			if _,err = GetServerInfoByIP(key.IP);err != nil{
+				fmt.Printf("\t%d\t%s\t%s\t%s\n",index+1,key.IP,key.version,key.filepath)
+			}
+		}
+	}
 	log.Printf("End. By Li Yilong")
+}
+
+func GetServerInfoByIP(ip string)(ServerInfo,error){
+	for _,info := range AllServer{
+		if info.IP == ip{
+			return info,nil
+		}
+	}
+	return ServerInfo{},nil
 }
 
 func ScanLog4J(index int,info ServerInfo) error {
@@ -201,4 +218,25 @@ func checkVersion(name string) string {
 		}
 	}
 	return ""
+}
+
+func fixWithRemove(info ServerInfo,log4jinfo Log4JInfo)error{
+	client,err := ssh.Dial("tcp",fmt.Sprintf("%s:%s",info.IP,info.Port),&ssh.ClientConfig{
+		User: info.Username,
+		Auth: []ssh.AuthMethod{ssh.Password(info.Password)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	})
+	if err != nil{
+		return err
+	}
+	session,err := client.NewSession()
+	if err != nil{
+		return err
+	}
+	defer session.Close()
+	_,err = session.Output(fmt.Sprintf("zip -q -d %s org/apache/logging/log4j/core/lookup/JndiLookup.class",log4jinfo.filepath))
+	if err != nil {
+		return err
+	}
+	return nil
 }
